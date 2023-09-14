@@ -1,0 +1,75 @@
+#@ load("@ytt:overlay", "overlay")
+
+#@overlay/match by=overlay.all, expects=1
+#@overlay/match-child-defaults missing_ok=True
+---
+supply_chain: testing_scanning
+#@overlay/remove
+ootb_supply_chain_basic:
+
+ootb_supply_chain_testing_scanning:
+  registry:
+    server: europe-west1-docker.pkg.dev
+    repository: tap-sandbox-dev/tapv-engaging-grubworm
+  gitops:
+    server_address: https://github.com
+    repository_owner: cdelashmutt-pivotal
+    repository_name: cdd-demo-gitops
+    commit_strategy: pull_request
+    pull_request:
+      server_kind: github
+      commit_branch: supply_chain
+      pull_request_title: Delivery from sandbox Supply Chain
+      pull_request_body: This is a candidate release for promotion
+
+namespace_provisioner:
+  controller: false
+  gitops_install:
+    ref: origin/main
+    subPath: clusters/cdd-demo-aws/namespace-provisioner/namespaces
+    url: https://github.com/cdelashmutt-pivotal/demo-clusters-tap
+  #@overlay/replace
+  additional_sources:
+    - git:
+        ref: origin/main
+        subPath: clusters/cdd-demo-aws/namespace-provisioner/testing-scanning-supplychain
+        url: https://github.com/cdelashmutt-pivotal/demo-clusters-tap
+      path: _ytt_lib/testing-scanning-supplychain
+  #@overlay/replace
+  overlay_secrets:
+  - name: workload-git-auth-overlay
+    namespace: tap-install
+    create_export: true
+
+tap_gui:
+  app_config:
+    customize:
+      default_route: '/docs/default/component/getting-started'
+    techdocs:
+      builder: 'external'
+      publisher:
+        type: 'awsS3'
+        awsS3:
+          bucketName: 'techdocs-storage'
+          accountId: minio
+          region: us-east-1
+          endpoint: http://minio.minio:9000
+          s3ForcePathStyle: true
+    aws:
+      #@overlay/replace
+      accounts:
+      - accountId: minio
+        accessKeyId: admin
+        secretAccessKey: VMware1!
+
+metadata_store:
+  ns_for_export_app_cert: "*"
+
+scanning:
+  resources:
+    limits:
+      cpu: "500m"
+      memory: 3Gi
+    requests:
+      cpu: 200m
+      memory: 1Gi
